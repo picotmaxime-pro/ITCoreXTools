@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>PerfLab-IT — ITCoreX</title>
+  <style>
+    :root {
+      --background: #1a1612;
+      --foreground: #f5f0e8;
+      --sand: #c9b896;
+      --beige: #e8dcc8;
+      --copper: #b87333;
+      --copper-light: #d4956a;
+      --brown-deep: #3d2914;
+      --orange-burnt: #cc5500;
+      --gold: #c5a572;
+      --gray-warm: #8b7355;
+      --charcoal: #2a2420;
+      --cream: #f7f3eb;
+    }
+
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+      background: var(--background);
+      color: var(--foreground);
+      min-height: 100vh;
+    }
+
+    /* Les styles seront injectés par React inline */
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+  <script>
+    // Le code React sera chargé comme module ES6
+    import('./App.jsx').then(module => {
+      const { PerfLabApp } = module;
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(React.createElement(PerfLabApp));
+    });
+  </script>
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.development.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="../shared/types.js"></script>
+  <script src="App.jsx"></script>
+</body>
+</html>

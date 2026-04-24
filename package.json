@@ -1,0 +1,88 @@
+{
+  "name": "itcorex-tools",
+  "version": "1.0.0",
+  "description": "PerfLab-IT and DoctoLab-IT desktop applications for ITCoreX",
+  "main": "build/main.js",
+  "scripts": {
+    "dev:perflab": "npm run build:perflab && APP_TARGET=perflab electron build/main.js",
+    "dev:doctolab": "npm run build:doctolab && APP_TARGET=doctolab electron build/main.js",
+    "start:perflab": "APP_TARGET=perflab electron build/main.js",
+    "start:doctolab": "APP_TARGET=doctolab electron build/main.js",
+    "build": "tsc && npm run build:renderer",
+    "build:perflab": "tsc && APP_TARGET=perflab webpack --mode=development",
+    "build:doctolab": "tsc && APP_TARGET=doctolab webpack --mode=development",
+    "build:renderer": "APP_TARGET=perflab webpack --mode=production",
+    "watch:perflab": "tsc && APP_TARGET=perflab webpack --mode=development --watch",
+    "watch:doctolab": "tsc && APP_TARGET=doctolab webpack --mode=development --watch",
+    "pack": "npm run build && electron-builder --dir",
+    "dist": "npm run build && electron-builder",
+    "dist:win": "npm run build && electron-builder --win",
+    "dist:mac": "npm run build && electron-builder --mac",
+    "dist:linux": "npm run build && electron-builder --linux",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "keywords": ["electron", "benchmark", "diagnostic", "hardware", "itcorex"],
+  "author": "ITCoreX <contact@itcorex.fr>",
+  "license": "MIT",
+  "build": {
+    "appId": "fr.itcorex.tools",
+    "productName": "ITCoreXTools",
+    "artifactName": "${productName}-${version}-${os}.${ext}",
+    "directories": {
+      "output": "dist",
+      "buildResources": "assets"
+    },
+    "files": [
+      "build/**/*",
+      "assets/**/*",
+      "node_modules/**/*"
+    ],
+    "mac": {
+      "category": "public.app-category.utilities",
+      "target": ["dmg", "zip"]
+    },
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": ["x64"]
+        },
+        {
+          "target": "portable",
+          "arch": ["x64"]
+        }
+      ],
+      "requestedExecutionLevel": "asInvoker"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "deleteAppDataOnUninstall": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "category": "Utility"
+    }
+  },
+  "dependencies": {
+    "systeminformation": "^5.31.5"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "electron": "^28.0.0",
+    "electron-builder": "^24.0.0",
+    "html-webpack-plugin": "^5.6.0",
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "typescript": "^5.3.0",
+    "ts-loader": "^9.5.0",
+    "webpack": "^5.89.0",
+    "webpack-cli": "^5.1.0",
+    "css-loader": "^6.8.0",
+    "style-loader": "^3.3.0"
+  }
+}

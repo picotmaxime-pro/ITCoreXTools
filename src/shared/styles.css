@@ -1,0 +1,129 @@
+/* Styles ITCoreX - Palette chaude */
+:root {
+  --background: #1a1612;
+  --foreground: #f5f0e8;
+  --sand: #c9b896;
+  --beige: #e8dcc8;
+  --copper: #b87333;
+  --copper-light: #d4956a;
+  --brown-deep: #3d2914;
+  --orange-burnt: #cc5500;
+  --gold: #c5a572;
+  --gray-warm: #8b7355;
+  --charcoal: #2a2420;
+  --cream: #f7f3eb;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+  background: var(--background);
+  color: var(--foreground);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+/* Typography */
+h1, h2, h3, h4, h5, h6 {
+  font-weight: 600;
+  line-height: 1.2;
+}
+
+/* Buttons */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px 24px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  border: none;
+  transition: all 0.3s ease;
+}
+
+.btn-primary {
+  background: var(--copper);
+  color: var(--cream);
+}
+
+.btn-primary:hover {
+  background: var(--copper-light);
+  box-shadow: 0 0 20px rgba(184, 115, 51, 0.3);
+}
+
+.btn-secondary {
+  background: transparent;
+  color: var(--copper);
+  border: 1px solid var(--copper);
+}
+
+.btn-secondary:hover {
+  background: rgba(184, 115, 51, 0.1);
+}
+
+/* Cards */
+.card {
+  background: var(--charcoal);
+  border: 1px solid rgba(184, 115, 51, 0.2);
+  padding: 24px;
+}
+
+/* Progress bar */
+.progress-bar {
+  width: 100%;
+  height: 8px;
+  background: var(--brown-deep);
+  overflow: hidden;
+}
+
+.progress-fill {
+  height: 100%;
+  background: var(--copper);
+  transition: width 0.3s ease;
+}
+
+/* Status indicators */
+.status-ok { color: #4ade80; }
+.status-warning { color: #fbbf24; }
+.status-error { color: #ef4444; }
+
+/* Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--charcoal);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--copper);
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--copper-light);
+}
+
+/* Utility classes */
+.text-gradient {
+  background: linear-gradient(135deg, var(--copper) 0%, var(--gold) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.glass {
+  background: rgba(42, 36, 32, 0.8);
+  backdrop-filter: blur(12px);
+}
+
+.glow {
+  box-shadow: 0 0 30px rgba(184, 115, 51, 0.2);
+}
