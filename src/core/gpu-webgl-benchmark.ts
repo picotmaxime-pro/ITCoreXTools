@@ -28,12 +28,13 @@ export class GPUWebGLBenchmark {
 
       this.isRunning = true;
 
-      // Créer une fenêtre cachée (pas offscreen pour avoir accès au GPU)
+      // Créer une fenêtre visible pour montrer le benchmark GPU en action
       this.window = new BrowserWindow({
-        width: 1920,
-        height: 1080,
-        show: false, // Fenêtre cachée mais avec accès GPU
-        skipTaskbar: true,
+        width: 800,
+        height: 600,
+        show: true, // Fenêtre VISIBLE pour voir le GPU travailler
+        title: 'GPU Benchmark - WebGL Test',
+        alwaysOnTop: false,
         webPreferences: {
           contextIsolation: true,
           nodeIntegration: false,
@@ -41,9 +42,7 @@ export class GPUWebGLBenchmark {
         },
       });
       
-      // Masquer la fenêtre immédiatement après création
       this.window.setMenu(null);
-      this.window.hide();
 
       // HTML avec benchmark WebGL
       const benchmarkHTML = `
@@ -63,11 +62,23 @@ export class GPUWebGLBenchmark {
               font-family: monospace;
               font-size: 14px;
               z-index: 100;
+              background: rgba(0,0,0,0.7);
+              padding: 10px;
+              border-radius: 5px;
             }
+            #info h3 { margin: 0 0 5px 0; color: #0ff; }
+            #info .label { color: #888; }
+            #info .value { color: #fff; font-weight: bold; }
           </style>
         </head>
         <body>
-          <div id="info">FPS: <span id="fps">0</span> | Frame: <span id="frame">0</span></div>
+          <div id="info">
+            <h3>GPU Benchmark Running...</h3>
+            <span class="label">FPS:</span> <span id="fps" class="value">0</span><br>
+            <span class="label">Frame:</span> <span id="frame" class="value">0</span><br>
+            <span class="label">GPU:</span> <span id="gpuName" class="value">Detecting...</span><br>
+            <span class="label">Status:</span> <span style="color:#0f0">RENDERING</span>
+          </div>
           <canvas id="glCanvas"></canvas>
           <script>
             const canvas = document.getElementById('glCanvas');
@@ -319,6 +330,7 @@ export class GPUWebGLBenchmark {
               if (frameCount % 10 === 0) {
                 document.getElementById('fps').textContent = fps.toFixed(1);
                 document.getElementById('frame').textContent = frameCount;
+                document.getElementById('gpuName').textContent = gpuInfo.renderer.substring(0, 30);
               }
 
               // Render
