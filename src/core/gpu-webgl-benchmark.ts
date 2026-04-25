@@ -34,18 +34,31 @@ export class GPUWebGLBenchmark {
       this.window = new BrowserWindow({
         width: 900,
         height: 700,
-        show: true,
+        show: false, // Show after load to avoid white flash
         title: 'GPU Benchmark - WebGL Test',
         alwaysOnTop: false,
+        backgroundColor: '#000000',
         webPreferences: {
-          contextIsolation: false, // Need this for window.webglResult
-          nodeIntegration: false,
+          contextIsolation: false,
+          nodeIntegration: true, // Need full access
           offscreen: false,
           webSecurity: false,
+          allowRunningInsecureContent: true,
+          experimentalFeatures: true,
         },
       });
       
       this.window.setMenu(null);
+
+      // Enable hardware acceleration check
+      this.window.webContents.on('console-message', (event, level, message) => {
+        console.log(`WebGL Benchmark [${level}]:`, message);
+      });
+
+      // Show window when ready
+      this.window.once('ready-to-show', () => {
+        this.window?.show();
+      });
 
       // HTML avec benchmark WebGL robuste
       const benchmarkHTML = `
@@ -164,12 +177,43 @@ export class GPUWebGLBenchmark {
               document.getElementById('error-display').textContent = msg;
               console.error('WebGL Error:', msg);
             }
+            
+            function showStatus(msg) {
+              console.log('WebGL Status:', msg);
+              const infoDiv = document.querySelector('#info h3');
+              if (infoDiv) infoDiv.textContent = 'GPU: ' + msg;
+            }
 
             const canvas = document.getElementById('glCanvas');
-            const gl = canvas.getContext('webgl2') || canvas.getContext('experimental-webgl') || canvas.getContext('webgl');
+            
+            // Set canvas size first
+            canvas.width = 800;
+            canvas.height = 600;
+            
+            showStatus('Initializing WebGL...');
+            
+            // Try to get WebGL context with various fallbacks
+            let gl = null;
+            const contextTypes = ['webgl2', 'experimental-webgl2', 'webgl', 'experimental-webgl'];
+            
+            for (const type of contextTypes) {
+              try {
+                gl = canvas.getContext(type, { 
+                  antialias: false, 
+                  alpha: false,
+                  preserveDrawingBuffer: true 
+                });
+                if (gl) {
+                  console.log('Got WebGL context:', type);
+                  break;
+                }
+              } catch(e) {
+                console.log(type + ' failed:', e);
+              }
+            }
             
             if (!gl) {
-              showError('WebGL not supported on this system');
+              showError('WebGL not supported - No context could be created');
               window.webglResult = { 
                 success: false, 
                 error: 'WebGL not supported',
@@ -184,6 +228,8 @@ export class GPUWebGLBenchmark {
               return;
             }
 
+            showStatus('Getting GPU info...');
+
             // Get GPU info
             let renderer = 'Unknown';
             let vendor = 'Unknown';
@@ -192,9 +238,14 @@ export class GPUWebGLBenchmark {
               if (debugInfo) {
                 renderer = gl.getParameter(debugInfo.UNMASKED_RENDERER_WEBGL) || 'Unknown';
                 vendor = gl.getParameter(debugInfo.UNMASKED_VENDOR_WEBGL) || 'Unknown';
+                console.log('GPU detected:', renderer, 'from', vendor);
+              } else {
+                console.log('WEBGL_debug_renderer_info not available');
+                renderer = gl.getParameter(gl.RENDERER) || 'Unknown';
+                vendor = gl.getParameter(gl.VENDOR) || 'Unknown';
               }
             } catch(e) {
-              console.log('Could not get GPU debug info');
+              console.log('Could not get GPU info:', e);
             }
             
             const gpuInfo = {
@@ -204,10 +255,8 @@ export class GPUWebGLBenchmark {
               maxViewportDims: gl.getParameter(gl.MAX_VIEWPORT_DIMS) || [0, 0]
             };
 
-            // Set canvas size
-            canvas.width = 1024;
-            canvas.height = 768;
             gl.viewport(0, 0, canvas.width, canvas.height);
+            showStatus('Compiling shaders...');
 
             // Simple vertex shader
             const vertexShaderSource = \`
@@ -286,12 +335,10 @@ export class GPUWebGLBenchmark {
             }
 
             const vertexShader = compileShader(vertexShaderSource, gl.VERTEX_SHADER);
-            const fragmentShader = compileShader(fragmentShaderSource, gl.FRAGMENT_SHADER);
-
-            if (!vertexShader || !fragmentShader) {
+            if (!vertexShader) {
               window.webglResult = { 
                 success: false, 
-                error: 'Shader compilation failed',
+                error: 'Vertex shader compilation failed',
                 score: 0,
                 averageFps: 0,
                 minFps: 0,
@@ -302,6 +349,24 @@ export class GPUWebGLBenchmark {
               };
               return;
             }
+            
+            const fragmentShader = compileShader(fragmentShaderSource, gl.FRAGMENT_SHADER);
+            if (!fragmentShader) {
+              window.webglResult = { 
+                success: false, 
+                error: 'Fragment shader compilation failed',
+                score: 0,
+                averageFps: 0,
+                minFps: 0,
+                maxFps: 0,
+                frameCount: 0,
+                testDuration: 0,
+                gpuInfo: gpuInfo
+              };
+              return;
+            }
+
+            showStatus('Linking program...');
 
             // Link program
             const program = gl.createProgram();
@@ -341,6 +406,11 @@ export class GPUWebGLBenchmark {
             const timeLocation = gl.getUniformLocation(program, 'time');
             const resolutionLocation = gl.getUniformLocation(program, 'resolution');
             gl.uniform2f(resolutionLocation, canvas.width, canvas.height);
+
+            showStatus('Starting benchmark...');
+
+            // Update GPU name display immediately
+            document.getElementById('gpuName').textContent = gpuInfo.renderer.substring(0, 20);
 
             // Benchmark tracking
             let frameCount = 0;
