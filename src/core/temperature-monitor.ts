@@ -23,9 +23,19 @@ export class TemperatureMonitor {
   private checkAdminPrivileges(): void {
     try {
       if (this.platform === 'win32') {
-        // Check if running as admin on Windows
-        execSync('net session', { stdio: 'ignore' });
-        this.isAdmin = true;
+        // Check if running as admin on Windows using multiple methods
+        try {
+          execSync('net session', { stdio: 'ignore' });
+          this.isAdmin = true;
+        } catch {
+          // Try alternative method
+          try {
+            const result = execSync('whoami /groups | findstr S-1-16-12288', { stdio: 'pipe', encoding: 'utf8' });
+            this.isAdmin = result.includes('12288');
+          } catch {
+            this.isAdmin = false;
+          }
+        }
       } else {
         this.isAdmin = process.getuid?.() === 0 || false;
       }
@@ -128,14 +138,57 @@ export class TemperatureMonitor {
     try {
       const nvidiaResult = execSync(
         'nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader',
-        { encoding: 'utf8', timeout: 3000 }
+        { encoding: 'utf8', timeout: 3000, shell: 'cmd' }
       );
       const gpuTemp = parseInt(nvidiaResult.trim());
-      if (!isNaN(gpuTemp)) {
+      if (!isNaN(gpuTemp) && gpuTemp > 0 && gpuTemp < 120) {
         gpu = gpuTemp;
       }
     } catch {
       // nvidia-smi not available or no NVIDIA GPU
+    }
+    
+    // Try LibreHardwareMonitor CLI if available (more reliable)
+    if (!cpu || !gpu) {
+      try {
+        const lhmResult = execSync(
+          'powershell -Command "Get-WmiObject -Namespace root/LibreHardwareMonitor -Class Sensor | Where-Object { $_.SensorType -eq \u0027Temperature\u0027 } | Select-Object -ExpandProperty Value"',
+          { encoding: 'utf8', timeout: 5000 }
+        );
+        const temps = lhmResult.trim().split('\n')
+          .map(t => parseFloat(t.trim()))
+          .filter(t => !isNaN(t) && t > 0 && t < 120);
+        if (temps.length > 0 && !cpu) {
+          cpu = Math.round(Math.max(...temps));
+        }
+      } catch {
+        // LibreHardwareMonitor not installed
+      }
+    }
+    
+    // Try OHM (Open Hardware Monitor) as fallback
+    if (!cpu) {
+      try {
+        const ohmResult = execSync(
+          'powershell -Command "Get-WmiObject -Namespace root/OpenHardwareMonitor -Class Sensor | Where-Object { $_.SensorType -eq \u0027Temperature\u0027 } | Select-Object Name, Value"',
+          { encoding: 'utf8', timeout: 5000 }
+        );
+        const lines = ohmResult.trim().split('\n');
+        for (const line of lines) {
+          if (line.toLowerCase().includes('cpu') || line.toLowerCase().includes('core')) {
+            const match = line.match(/(\d+\.?\d*)/);
+            if (match) {
+              const temp = parseFloat(match[1]);
+              if (temp > 0 && temp < 120) {
+                cpu = Math.round(temp);
+                break;
+              }
+            }
+          }
+        }
+      } catch {
+        // OHM not available
+      }
     }
 
     return {
@@ -268,10 +321,18 @@ export class TemperatureMonitor {
   // Get admin requirement message
   getAdminMessage(): string {
     if (this.platform === 'win32') {
-      return 'Lancer en tant qu\'administrateur pour voir les températures';
+      if (!this.isAdmin) {
+        return 'Relancer en admin pour les températures';
+      }
+      return 'Temp CPU/GPU via WMI/LibreHardwareMonitor';
     } else if (this.platform === 'darwin') {
-      return 'Températures indisponibles sur Apple Silicon (limitation macOS)';
+      return 'Températures indisponibles sur Apple Silicon';
     }
     return 'Températures indisponibles';
+  }
+
+  // Check if LibreHardwareMonitor is recommended
+  isLibreHardwareMonitorRecommended(): boolean {
+    return this.platform === 'win32' && !this.isAdmin;
   }
 }
