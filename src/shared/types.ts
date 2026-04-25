@@ -98,6 +98,16 @@ export interface BenchmarkResult {
       testDuration: number;
       averageUsage: number;
       peakUsage: number;
+      webglResult?: {
+        averageFps: number;
+        minFps: number;
+        maxFps: number;
+        score: number;
+        gpuInfo: {
+          renderer: string;
+          vendor: string;
+        };
+      };
     };
     ram: {
       readSpeed: number;

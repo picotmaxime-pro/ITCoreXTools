@@ -309,6 +309,10 @@ export const PerfLabApp: React.FC = () => {
                   <span style={styles.scoreNumber}>{result.cpuScore.toLocaleString()}</span>
                 </div>
                 <div style={styles.scoreItem}>
+                  <span style={styles.scoreLabel}>GPU</span>
+                  <span style={styles.scoreNumber}>{result.gpuScore.toLocaleString()}</span>
+                </div>
+                <div style={styles.scoreItem}>
                   <span style={styles.scoreLabel}>RAM</span>
                   <span style={styles.scoreNumber}>{result.ramScore.toLocaleString()}</span>
                 </div>
@@ -323,6 +327,15 @@ export const PerfLabApp: React.FC = () => {
                   <h4>CPU Details</h4>
                   <p>Single-core: {result.details.cpu.singleCore.toLocaleString()} ops/s</p>
                   <p>Multi-core: {result.details.cpu.multiCore.toLocaleString()} ops/s</p>
+                </div>
+                <div style={styles.detailCard}>
+                  <h4>GPU Details</h4>
+                  <p>Score: {result.details.gpu.computeScore.toLocaleString()}</p>
+                  <p>Memory: {result.details.gpu.memoryBandwidth} GB/s</p>
+                  <p>Usage: {result.details.gpu.averageUsage}%</p>
+                  {result.details.gpu.webglResult && (
+                    <p>WebGL FPS: {result.details.gpu.webglResult.averageFps}</p>
+                  )}
                 </div>
                 <div style={styles.detailCard}>
                   <h4>RAM Details</h4>
