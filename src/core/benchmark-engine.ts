@@ -1,6 +1,7 @@
 import * as os from 'os';
 import * as fs from 'fs';
 import * as path from 'path';
+import { execSync } from 'child_process';
 import { HardwareAnalyzer } from './hardware-analyzer';
 import { AdaptiveCPUBenchmark } from './adaptive-cpu-benchmark';
 import { BottleneckDetector, BottleneckAnalysis } from './bottleneck-detector';
@@ -94,6 +95,7 @@ interface CombinedTestDetails {
   stabilityScore: number;
   bottleneckAnalysis?: BottleneckAnalysis;
   realCPUDetails?: { singleCore: number; multiCore: number; instructionsPerSecond: number };
+  webglResult?: WebGLBenchmarkResult;
 }
 
 interface CPUBenchmarkDetails {
@@ -147,6 +149,71 @@ export class BenchmarkEngine {
     return 300 * (duration / 5);
   }
 
+  // Get real-time CPU frequency
+  private getRealTimeCPUFrequency(): number {
+    try {
+      const platform = os.platform();
+      
+      if (platform === 'darwin') {
+        // macOS: Try powermetrics for real-time frequency
+        try {
+          const result = execSync(
+            'powermetrics --samplers cpu_power -n 1 -i 50 2>/dev/null | grep "CPU frequency" | head -1',
+            { encoding: 'utf8', timeout: 2000 }
+          );
+          const match = result.match(/(\d+\.?\d*)\s*MHz/);
+          if (match) {
+            return parseFloat(match[1]) / 1000; // Convert MHz to GHz
+          }
+        } catch {
+          // Fallback to sysctl
+          try {
+            const result = execSync('sysctl -n hw.cpufrequency 2>/dev/null', 
+              { encoding: 'utf8', timeout: 1000 }
+            );
+            const freq = parseInt(result.trim());
+            if (!isNaN(freq) && freq > 0) {
+              return freq / 1000000000; // Convert Hz to GHz
+            }
+          } catch {
+            // sysctl failed
+          }
+        }
+      } else if (platform === 'linux') {
+        // Linux: Read from /proc/cpuinfo or use cpupower
+        try {
+          const result = execSync(
+            'cat /proc/cpuinfo | grep "cpu MHz" | head -1',
+            { encoding: 'utf8', timeout: 1000 }
+          );
+          const match = result.match(/(\d+\.?\d*)/);
+          if (match) {
+            return parseFloat(match[1]) / 1000; // MHz to GHz
+          }
+        } catch {
+          // Fallback
+        }
+      } else if (platform === 'win32') {
+        // Windows: Try wmic for current clock speed
+        try {
+          const result = execSync(
+            'wmic cpu get CurrentClockSpeed /value 2>nul',
+            { encoding: 'utf8', timeout: 2000, shell: 'cmd' }
+          );
+          const match = result.match(/CurrentClockSpeed=(\d+)/);
+          if (match) {
+            return parseInt(match[1]) / 1000; // MHz to GHz
+          }
+        } catch {
+          // WMI failed
+        }
+      }
+    } catch {
+      // All methods failed
+    }
+    return 0;
+  }
+
   // Collecte des métriques en temps réel
   private async collectMetrics(): Promise<RealTimeMetrics> {
     const [cpuInfo, gpuInfo, ramInfo] = await Promise.all([
@@ -156,12 +223,16 @@ export class BenchmarkEngine {
     ]);
 
     const temps = await this.hardwareAnalyzer.getTemperatures();
+    
+    // Get real-time frequency if available, otherwise use nominal
+    const realTimeFreq = this.getRealTimeCPUFrequency();
+    const cpuFrequency = realTimeFreq > 0 ? realTimeFreq : (cpuInfo.speed || 0);
 
     return {
       timestamp: Date.now(),
       cpu: {
         usage: cpuInfo.usage || 0,
-        frequency: cpuInfo.speed || 0,
+        frequency: cpuFrequency,
         temperature: temps.cpu,
       },
       gpu: {
@@ -665,10 +736,20 @@ export class BenchmarkEngine {
       this.cpuWorkers.push(cpuWorker);
     }
     
-    // Worker GPU intensif avec comptage
+    // WebGL GPU Benchmark - runs in parallel with CPU
+    let webglResult: WebGLBenchmarkResult | null = null;
     if (options.gpu) {
-      const gpuWorker = this.runIntensiveGPUWorkerWithCount(duration, (ops) => { gpuOperations += ops; });
-      this.cpuWorkers.push(gpuWorker);
+      const gpuWebGL = new GPUWebGLBenchmark();
+      const gpuBenchmarkPromise = gpuWebGL.run(duration).then(result => {
+        webglResult = result;
+        gpuOperations = result.score * 1000; // Convert score to operations equivalent
+      }).catch(err => {
+        console.error('WebGL benchmark failed:', err);
+        // Fallback to CPU-based GPU simulation
+        const gpuWorker = this.runIntensiveGPUWorkerWithCount(duration, (ops) => { gpuOperations += ops; });
+        this.cpuWorkers.push(gpuWorker);
+      });
+      this.cpuWorkers.push(gpuBenchmarkPromise);
     }
     
     // Worker RAM intensif
@@ -747,6 +828,7 @@ export class BenchmarkEngine {
         multiCore,
         instructionsPerSecond: multiCore,
       },
+      webglResult: webglResult || undefined,
     };
   }
 
@@ -1128,6 +1210,20 @@ export class BenchmarkEngine {
   }
 
   private extractGPUDetails(combined: CombinedTestDetails): GPUBenchmarkDetails {
+    // Use real WebGL benchmark score if available
+    if (combined.webglResult) {
+      const webgl = combined.webglResult;
+      return {
+        computeScore: Math.round(webgl.score || 0),
+        memoryBandwidth: Math.round(webgl.averageFps * 10),
+        testDuration: combined.duration,
+        averageUsage: Math.round(webgl.averageFps / 2), // Estimate GPU usage from FPS
+        peakUsage: Math.round(webgl.maxFps / 2),
+        webglResult: webgl,
+      };
+    }
+    
+    // Fallback to estimated score
     return {
       computeScore: Math.round(combined.gpuAverageUsage * 200),
       memoryBandwidth: Math.round(combined.gpuAverageUsage * 10),

@@ -204,44 +204,50 @@ export class TemperatureMonitor {
     let cpu: number | null = null;
     let gpu: number | null = null;
 
-    // Try macOS specific tools
+    // Method 1: SMC via system_profiler (no admin needed)
     try {
-      // Try istats (if installed)
-      const result = execSync('istats cpu --value-only', { encoding: 'utf8', timeout: 3000 });
-      const temp = parseFloat(result.trim());
-      if (!isNaN(temp)) {
-        cpu = Math.round(temp);
+      const result = execSync(
+        'system_profiler SPiBridgeDataType SPSensorsDataType SPPowerDataType 2>/dev/null | grep -i "temperature\|thermal" | head -5',
+        { encoding: 'utf8', timeout: 5000 }
+      );
+      // Parse any temperature values found
+      const temps = result.match(/(\d+)\.?\d*\s*°?C?/gi);
+      if (temps && temps.length > 0) {
+        const values = temps.map(t => parseInt(t)).filter(v => v > 20 && v < 120);
+        if (values.length > 0) {
+          cpu = Math.round(values[0]);
+        }
       }
     } catch {
-      // istats not installed
+      // system_profiler doesn't expose temps on most Macs
     }
 
-    // Try powermetrics (requires sudo)
-    if (this.isAdmin) {
+    // Method 2: Use powermetrics with sudo (requires admin password on first run)
+    if (!cpu) {
       try {
         const result = execSync(
-          'sudo powermetrics --samplers smc -n 1 -i 100 | grep -i "temperature"',
-          { encoding: 'utf8', timeout: 5000 }
+          'powermetrics --samplers smc -n 1 -i 10 2>/dev/null | grep -E "(CPU die|GPU die|thermal)" | head -3',
+          { encoding: 'utf8', timeout: 8000 }
         );
-        // Parse powermetrics output
-        const matches = result.match(/(\d+\.?\d*)\s*C/);
+        const matches = result.match(/(\d+\.?\d*)\s*[°Cc]/);
         if (matches) {
           cpu = Math.round(parseFloat(matches[1]));
         }
-      } catch (e: any) {
-        errors.push(`powermetrics: ${e.message}`);
+      } catch {
+        // powermetrics requires root or specific entitlements
       }
     }
 
-    // Try system_profiler for GPU info
+    // Method 3: Check thermal pressure via pmset
     try {
-      const result = execSync(
-        'system_profiler SPDisplaysDataType | grep -i "temperature\|temp"',
+      const result = execSync('pmset -g thermlog 2>/dev/null | grep -i "thermal" | head -1', 
         { encoding: 'utf8', timeout: 3000 }
       );
-      // Parse if temperature is reported
+      if (result.toLowerCase().includes('normal')) {
+        // Can't get exact temp but can infer it's in normal range (40-80°C)
+      }
     } catch {
-      // GPU temp not available in system_profiler
+      // pmset thermal info not available
     }
 
     return {
@@ -249,7 +255,7 @@ export class TemperatureMonitor {
       gpu,
       main: cpu,
       cores: cpu ? [cpu] : [],
-      error: errors.length > 0 && !cpu ? errors.join('; ') : undefined,
+      error: !cpu ? 'Températures non accessibles sur macOS ( limitation système)' : undefined,
     };
   }
 
@@ -324,15 +330,10 @@ export class TemperatureMonitor {
       if (!this.isAdmin) {
         return 'Relancer en admin pour les températures';
       }
-      return 'Temp CPU/GPU via WMI/LibreHardwareMonitor';
+      return 'Températures via WMI';
     } else if (this.platform === 'darwin') {
-      return 'Températures indisponibles sur Apple Silicon';
+      return 'Températures CPU indisponibles (macOS)';
     }
     return 'Températures indisponibles';
-  }
-
-  // Check if LibreHardwareMonitor is recommended
-  isLibreHardwareMonitorRecommended(): boolean {
-    return this.platform === 'win32' && !this.isAdmin;
   }
 }
